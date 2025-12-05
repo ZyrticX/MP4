@@ -349,7 +349,7 @@ export class JDownloaderClient {
 
   /**
    * Make an API call to the server (not device)
-   * Uses GET for calls without params, POST with encrypted body for calls with params
+   * Always uses POST with encrypted body per MyJDownloader spec
    */
   private async callServer(path: string, params?: unknown[]): Promise<any> {
     if (!this.session) {
@@ -358,39 +358,31 @@ export class JDownloaderClient {
     
     const rid = generateRequestId();
     
-    // Build query string for signature
+    // Build query string for signature - signature is calculated on path?rid=<rid>
     const queryForSignature = `${path}?rid=${rid}`;
     const signature = createSignature(queryForSignature, this.session.serverEncryptionToken);
     const url = `${API_ENDPOINT}${path}?rid=${rid}&signature=${signature}`;
     
-    let response: Response;
+    // POST with encrypted body - even for calls without params
+    const payload = {
+      apiVer: 1,
+      params: params || [],
+      rid,
+      url: path
+    };
     
-    if (params && params.length > 0) {
-      // POST with encrypted body for calls with params
-      const payload = {
-        rid,
-        params,
-        apiVer: 1
-      };
-      
-      const encryptedPayload = encrypt(
-        JSON.stringify(payload),
-        this.session.serverEncryptionToken
-      );
-      
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/aesjson-jd; charset=utf-8'
-        },
-        body: encryptedPayload
-      });
-    } else {
-      // GET for calls without params (like listdevices)
-      response = await fetch(url, {
-        method: 'GET'
-      });
-    }
+    const encryptedPayload = encrypt(
+      JSON.stringify(payload),
+      this.session.serverEncryptionToken
+    );
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/aesjson-jd; charset=utf-8'
+      },
+      body: encryptedPayload
+    });
     
     console.log('callServer - url:', url, '- status:', response.status);
     
