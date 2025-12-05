@@ -350,6 +350,7 @@ export class JDownloaderClient {
   /**
    * Make an API call to the server (not device)
    * Uses GET for server API calls per MyJDownloader spec
+   * Includes sessiontoken in query string
    */
   private async callServer(path: string, params?: unknown[]): Promise<any> {
     if (!this.session) {
@@ -358,10 +359,10 @@ export class JDownloaderClient {
     
     const rid = generateRequestId();
     
-    // Build query string for signature - signature is calculated on path?rid=<rid>
-    const queryForSignature = `${path}?rid=${rid}`;
+    // Build query string WITH sessiontoken - this is required for server calls!
+    const queryForSignature = `${path}?rid=${rid}&sessiontoken=${this.session.sessionToken}`;
     const signature = createSignature(queryForSignature, this.session.serverEncryptionToken);
-    const url = `${API_ENDPOINT}${path}?rid=${rid}&signature=${signature}`;
+    const url = `${API_ENDPOINT}${path}?rid=${rid}&sessiontoken=${this.session.sessionToken}&signature=${signature}`;
     
     console.log('callServer - Making GET request to:', url);
     
