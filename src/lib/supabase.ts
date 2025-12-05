@@ -1,126 +1,121 @@
 /**
- * Supabase Edge Function Client
- * Uses Edge Function instead of direct database access
+ * Supabase Client
+ * Direct database access using Supabase JS client
  */
+
+import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-const downloadApiSecret = process.env.DOWNLOAD_API_SECRET || 'change-this-secret';
+const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
 
 if (!supabaseUrl) {
-  throw new Error('Missing SUPABASE_URL environment variable');
+  console.warn('Missing SUPABASE_URL - database features will be disabled');
 }
 
-if (!supabaseAnonKey) {
-  throw new Error('Missing SUPABASE_ANON_KEY environment variable');
+if (!supabaseKey) {
+  console.warn('Missing SUPABASE_ANON_KEY - database features will be disabled');
 }
 
-const EDGE_FUNCTION_URL = `${supabaseUrl}/functions/v1/download-manager`;
+// Create Supabase client (or a mock if credentials are missing)
+export const supabase = supabaseUrl && supabaseKey 
+  ? createClient(supabaseUrl, supabaseKey)
+  : createMockClient();
 
 /**
- * Call the download-manager Edge Function
+ * Create a mock client when Supabase is not configured
+ * This allows the API to work without database storage
  */
-async function callEdgeFunction(
-  path: string,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-  body?: Record<string, unknown>
-): Promise<any> {
-  const url = `${EDGE_FUNCTION_URL}${path}`;
+function createMockClient() {
+  const mockJobs = new Map<string, DownloadJob>();
   
-  const response = await fetch(url, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${supabaseAnonKey}`,
-      'x-api-secret': downloadApiSecret,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  const data = await response.json() as { error?: string; [key: string]: unknown };
-  
-  if (!response.ok) {
-    throw new Error(data.error || `Edge function error: ${response.status}`);
-  }
-  
-  return data;
-}
-
-/**
- * Supabase-like interface using Edge Functions
- */
-export const supabase = {
-  from: (table: string) => {
-    if (table !== 'download_jobs') {
-      throw new Error(`Table "${table}" is not supported. Only "download_jobs" is available.`);
-    }
-    
-    return {
+  return {
+    from: (table: string) => ({
       insert: (data: Record<string, unknown>) => ({
         select: () => ({
           single: async () => {
-            const result = await callEdgeFunction('/create', 'POST', {
-              userId: data.user_id,
-              sourceUrl: data.source_url,
-              sourcePlatform: data.source_platform,
-              mediaType: data.media_type,
-              preferredQuality: data.preferred_quality,
-              targetCourseId: data.target_course_id,
-              targetChapterId: data.target_chapter_id,
-            });
-            return { data: result.job, error: null };
+            const job: DownloadJob = {
+              id: crypto.randomUUID(),
+              user_id: data.user_id as string || null,
+              source_url: data.source_url as string,
+              source_platform: data.source_platform as string || null,
+              media_type: data.media_type as 'video' | 'audio' | 'both',
+              preferred_quality: data.preferred_quality as string || '1080p',
+              status: 'pending',
+              progress: 0,
+              speed_bps: null,
+              eta_seconds: null,
+              jd_job_id: null,
+              jd_package_id: null,
+              jd_link_ids: null,
+              file_name: null,
+              file_size: null,
+              file_path: null,
+              storage_url: null,
+              thumbnail_url: null,
+              duration: null,
+              title: null,
+              description: null,
+              source_metadata: {},
+              target_video_id: null,
+              target_course_id: data.target_course_id as string || null,
+              target_chapter_id: data.target_chapter_id as string || null,
+              error_message: null,
+              retry_count: 0,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              started_at: null,
+              completed_at: null,
+            };
+            mockJobs.set(job.id, job);
+            console.log('📝 Mock: Created job', job.id);
+            return { data: job, error: null };
           }
         })
       }),
       
       update: (updates: Record<string, unknown>) => ({
-        eq: (column: string, value: string) => ({
-          select: () => ({
-            single: async () => {
-              // Convert snake_case to camelCase for Edge Function
-              const camelCaseUpdates: Record<string, unknown> = {};
-              for (const [key, val] of Object.entries(updates)) {
-                const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-                camelCaseUpdates[camelKey] = val;
-              }
-              
-              const result = await callEdgeFunction('/update', 'PUT', {
-                jobId: value,
-                ...camelCaseUpdates,
-              });
-              return { data: result.job, error: null };
+        eq: (column: string, value: string) => {
+          const updateFn = async () => {
+            const job = mockJobs.get(value);
+            if (job) {
+              Object.assign(job, updates, { updated_at: new Date().toISOString() });
+              mockJobs.set(value, job);
+              console.log('📝 Mock: Updated job', value);
             }
-          }),
-          // For update without select
-          then: async (resolve: (value: { error: null }) => void) => {
-            await callEdgeFunction('/update', 'PUT', {
-              jobId: value,
-              ...updates,
-            });
-            resolve({ error: null });
-          }
-        })
+            return { data: job, error: null };
+          };
+          
+          return {
+            select: () => ({
+              single: updateFn
+            }),
+            then: async (resolve: (value: { error: null }) => void) => {
+              await updateFn();
+              resolve({ error: null });
+            }
+          };
+        }
       }),
       
       select: (columns = '*') => ({
         eq: (column: string, value: string) => ({
           single: async () => {
             if (column === 'id') {
-              const result = await callEdgeFunction(`/status/${value}`, 'GET');
-              return { data: result.job, error: null };
+              const job = mockJobs.get(value);
+              return { data: job || null, error: job ? null : { message: 'Not found' } };
             }
-            if (column === 'user_id') {
-              const result = await callEdgeFunction(`/user/${value}`, 'GET');
-              return { data: result.jobs, error: null };
-            }
-            throw new Error(`Unsupported query: select where ${column} = ${value}`);
+            return { data: null, error: { message: 'Not found' } };
           },
           order: (orderColumn: string, options: { ascending: boolean }) => ({
             limit: (limit: number) => ({
               then: async (resolve: (value: { data: any[]; error: null }) => void) => {
                 if (column === 'user_id') {
-                  const result = await callEdgeFunction(`/user/${value}?limit=${limit}`, 'GET');
-                  resolve({ data: result.jobs || [], error: null });
+                  const jobs = Array.from(mockJobs.values())
+                    .filter(j => j.user_id === value)
+                    .slice(0, limit);
+                  resolve({ data: jobs, error: null });
+                } else {
+                  resolve({ data: [], error: null });
                 }
               }
             })
@@ -129,15 +124,14 @@ export const supabase = {
         order: (column: string, options: { ascending: boolean }) => ({
           limit: (limit: number) => ({
             then: async (resolve: (value: { data: any[]; error: null }) => void) => {
-              // This would need a new endpoint - for now return empty
               resolve({ data: [], error: null });
             }
           })
         })
       })
-    };
-  }
-};
+    })
+  };
+}
 
 // Types for our tables
 export interface DownloadJob {
