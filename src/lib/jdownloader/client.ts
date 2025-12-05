@@ -414,9 +414,19 @@ export class JDownloaderClient {
     
     const rid = generateRequestId();
     
+    // Build the device URL
+    const devicePath = `/t_${this.session.sessionToken}_${this.currentDevice.id}${action}`;
+    
+    // Calculate signature on the path
+    const signature = createSignature(devicePath, this.session.deviceEncryptionToken);
+    
+    // IMPORTANT: The url field in body must match what device receives after stripping prefix
+    // Device receives: /action?signature=xxx, so body.url must also be /action?signature=xxx
+    const urlWithSignature = `${action}?signature=${signature}`;
+    
     // Build the request object
     const requestData = {
-      url: action,
+      url: urlWithSignature,
       params: params || [],
       rid,
       apiVer: 1
@@ -428,12 +438,10 @@ export class JDownloaderClient {
       this.session.deviceEncryptionToken
     );
     
-    // Build the device URL with session token AND rid
-    const devicePath = `/t_${this.session.sessionToken}_${this.currentDevice.id}${action}`;
-    const queryWithRid = `${devicePath}?rid=${rid}`;
-    const signature = createSignature(queryWithRid, this.session.deviceEncryptionToken);
+    console.log('callDevice - sending to:', `${API_ENDPOINT}${devicePath}?signature=${signature}`);
+    console.log('callDevice - body.url:', urlWithSignature);
     
-    const response = await fetch(`${API_ENDPOINT}${devicePath}?rid=${rid}&signature=${signature}`, {
+    const response = await fetch(`${API_ENDPOINT}${devicePath}?signature=${signature}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/aesjson-jd; charset=utf-8'
