@@ -131,56 +131,53 @@ git clone https://github.com/ZyrticX/MP4.git avimp4
 
 # מעבר לתיקייה
 cd avimp4
-```
 
-### המשך ההתקנה:
-
-```bash
 # התקנת dependencies
 npm install
 
 # יצירת תיקיית הורדות
 mkdir -p downloads
+```
 
-# העתקת תבנית ההגדרות
-cp env.template .env
+### יצירת קובץ .env:
 
-# עריכת קובץ ההגדרות
+```bash
 nano .env
 ```
 
-### תוכן קובץ .env (ערוך את הערכים!):
+### העתק את התוכן הבא (החלף את הערכים המסומנים!):
 
 ```env
 # ═══════════════════════════════════════════════════════════════════
 # MyJDownloader - הפרטים מהחשבון שלך ב-my.jdownloader.org
 # ═══════════════════════════════════════════════════════════════════
-MYJD_EMAIL=האימייל_שלך@example.com
-MYJD_PASSWORD=הסיסמה_שלך
+MYJD_EMAIL=YOUR_EMAIL@example.com
+MYJD_PASSWORD=YOUR_PASSWORD
 MYJD_DEVICE_NAME=HetznerServer
 
 # ═══════════════════════════════════════════════════════════════════
-# Supabase - הפרויקט שלך
+# Supabase - streemix.com
 # ═══════════════════════════════════════════════════════════════════
 SUPABASE_URL=https://jdyekwizsviuyklsrsky.supabase.co
-SUPABASE_ANON_KEY=המפתח_הציבורי_שלך
-SUPABASE_SERVICE_ROLE_KEY=המפתח_הסודי_מ_Dashboard
+SUPABASE_ANON_KEY=YOUR_ANON_KEY
+
+# API Secret - לאימות בקשות (חייב להיות זהה למה שב-Edge Function!)
+DOWNLOAD_API_SECRET=e977d952339bb0fcda0def1be3d78a608240b93adf1360b93c2ef12f10fe9e45
 
 # ═══════════════════════════════════════════════════════════════════
 # Server
 # ═══════════════════════════════════════════════════════════════════
 PORT=3001
 NODE_ENV=production
-
-# CORS - הדומיין של האתר שלך (הפרונטאנד)
-# * = פתוח לכולם (לבדיקות)
-CORS_ORIGIN=*
+CORS_ORIGIN=https://streemix.com
 
 # ═══════════════════════════════════════════════════════════════════
 # Downloads
 # ═══════════════════════════════════════════════════════════════════
 DOWNLOAD_PATH=/opt/avimp4/downloads
 ```
+
+**שמור:** `Ctrl+X` → `Y` → `Enter`
 
 ---
 
@@ -224,47 +221,47 @@ systemctl status avimp4-api
 ## 🌐 שלב 8: הגדרת Nginx (Reverse Proxy)
 
 ```bash
-# התקנת Nginx
+# התקנת Nginx (אם לא מותקן)
 apt install -y nginx
 
 # הגדרת reverse proxy
 cat > /etc/nginx/sites-available/avimp4 << 'EOF'
 server {
     listen 80;
-    server_name YOUR_DOMAIN_OR_IP;
+    server_name api.streemix.com;
 
-    location /api/ {
-        proxy_pass http://localhost:3001/api/;
+    location / {
+        proxy_pass http://localhost:3001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
-    }
-
-    location /health {
-        proxy_pass http://localhost:3001/health;
     }
 }
 EOF
 
 # הפעלה
-ln -s /etc/nginx/sites-available/avimp4 /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/avimp4 /etc/nginx/sites-enabled/
 nginx -t
 systemctl restart nginx
 ```
 
+**💡 טיפ:** צור subdomain `api.streemix.com` שמצביע על ה-IP של השרת!
+
 ---
 
-## 🔒 שלב 9: הגדרת SSL (אופציונלי אבל מומלץ)
+## 🔒 שלב 9: הגדרת SSL (מומלץ מאוד!)
 
 ```bash
 # התקנת Certbot
 apt install -y certbot python3-certbot-nginx
 
 # קבלת תעודת SSL
-certbot --nginx -d YOUR_DOMAIN.com
+certbot --nginx -d api.streemix.com
 
 # חידוש אוטומטי
 systemctl enable certbot.timer
@@ -371,9 +368,54 @@ df -h /opt/avimp4/downloads
 
 **כתובת ה-API שלך:**
 ```
-http://YOUR_SERVER_IP/api/downloads
+https://api.streemix.com/api/downloads
 ```
 
-עדכן את הפרונטאנד שלך להשתמש בכתובת הזו!
+---
 
+## 📝 סיכום מהיר - רק הפקודות:
 
+```bash
+# 1. Clone the repo
+cd /opt
+git clone https://github.com/ZyrticX/MP4.git avimp4
+cd avimp4
+
+# 2. Install
+npm install
+mkdir -p downloads
+
+# 3. Create .env (edit with your values!)
+nano .env
+
+# 4. Build
+npm run build
+
+# 5. Create systemd service
+cat > /etc/systemd/system/avimp4-api.service << 'EOF'
+[Unit]
+Description=AviMP4 Download API
+After=network.target jdownloader.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/avimp4
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 6. Start service
+systemctl daemon-reload
+systemctl enable avimp4-api
+systemctl start avimp4-api
+
+# 7. Check status
+systemctl status avimp4-api
+curl http://localhost:3001/health
+```
