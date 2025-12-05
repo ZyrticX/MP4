@@ -341,6 +341,7 @@ export class JDownloaderClient {
 
   /**
    * Make an API call to the server (not device)
+   * Uses POST with encrypted body per MyJDownloader spec
    */
   private async callServer(path: string, params?: unknown[]): Promise<any> {
     if (!this.session) {
@@ -348,16 +349,33 @@ export class JDownloaderClient {
     }
     
     const rid = generateRequestId();
-    let query = `${path}?rid=${rid}`;
     
-    if (params && params.length > 0) {
-      query += `&params=${encodeURIComponent(JSON.stringify(params))}`;
-    }
+    // Build the payload
+    const payload = {
+      rid,
+      params: params || [],
+      apiVer: 1
+    };
     
-    const signature = createSignature(query, this.session.serverEncryptionToken);
-    query += `&signature=${signature}`;
+    // Encrypt the payload
+    const encryptedPayload = encrypt(
+      JSON.stringify(payload),
+      this.session.serverEncryptionToken
+    );
     
-    const response = await fetch(`${API_ENDPOINT}${query}`);
+    // Build query string for signature (only rid, no params)
+    const queryForSignature = `${path}?rid=${rid}`;
+    const signature = createSignature(queryForSignature, this.session.serverEncryptionToken);
+    
+    const url = `${API_ENDPOINT}${path}?rid=${rid}&signature=${signature}`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/aesjson-jd; charset=utf-8'
+      },
+      body: encryptedPayload
+    });
     
     if (!response.ok) {
       // Try to decrypt error response
