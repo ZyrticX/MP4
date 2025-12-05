@@ -71,13 +71,23 @@ export class JDownloaderClient {
       // First try to parse as plain JSON
       data = JSON.parse(responseText);
     } catch {
-      // Response might be encrypted - try to decrypt it
+      // Response is encrypted - decrypt it
       try {
+        console.log('Attempting to decrypt response...');
         const decrypted = decrypt(responseText, loginSecret);
+        console.log('Decrypted response:', decrypted.substring(0, 100));
+        
+        if (!decrypted || decrypted.length === 0) {
+          throw new Error('Decryption returned empty string');
+        }
+        
         data = JSON.parse(decrypted);
-      } catch {
-        console.error('MyJDownloader API response (encrypted):', responseText.substring(0, 200));
-        throw new Error(`MyJDownloader returned encrypted response. Make sure your credentials are correct.`);
+        console.log('Successfully parsed decrypted response');
+      } catch (decryptError) {
+        console.error('Decryption failed:', decryptError);
+        console.error('Encrypted response:', responseText.substring(0, 200));
+        console.error('Login secret (hex):', loginSecret.toString('hex').substring(0, 32) + '...');
+        throw new Error(`Decryption failed: ${decryptError instanceof Error ? decryptError.message : 'Unknown error'}`);
       }
     }
     

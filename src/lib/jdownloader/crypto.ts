@@ -58,37 +58,68 @@ export function encrypt(data: string, token: Buffer): string {
  * Decrypt data using AES-128-CBC
  */
 export function decrypt(encryptedData: string, token: Buffer): string {
-  // Convert token to WordArray properly
-  const keyWords: number[] = [];
-  const ivWords: number[] = [];
-  
-  for (let i = 0; i < 16; i += 4) {
-    keyWords.push(
-      (token[i] << 24) | (token[i + 1] << 16) | (token[i + 2] << 8) | token[i + 3]
+  try {
+    // Convert token to WordArray properly
+    const keyWords: number[] = [];
+    const ivWords: number[] = [];
+    
+    for (let i = 0; i < 16; i += 4) {
+      keyWords.push(
+        ((token[i] & 0xff) << 24) | 
+        ((token[i + 1] & 0xff) << 16) | 
+        ((token[i + 2] & 0xff) << 8) | 
+        (token[i + 3] & 0xff)
+      );
+    }
+    
+    for (let i = 16; i < 32; i += 4) {
+      ivWords.push(
+        ((token[i] & 0xff) << 24) | 
+        ((token[i + 1] & 0xff) << 16) | 
+        ((token[i + 2] & 0xff) << 8) | 
+        (token[i + 3] & 0xff)
+      );
+    }
+    
+    const key = CryptoJS.lib.WordArray.create(keyWords, 16);
+    const iv = CryptoJS.lib.WordArray.create(ivWords, 16);
+    
+    // Parse the Base64 encrypted data
+    const ciphertext = CryptoJS.enc.Base64.parse(encryptedData);
+    
+    const decrypted = CryptoJS.AES.decrypt(
+      { ciphertext: ciphertext } as CryptoJS.lib.CipherParams,
+      key,
+      {
+        iv: iv,
+        mode: CryptoJS.mode.CBC,
+        padding: CryptoJS.pad.Pkcs7
+      }
     );
+    
+    const result = decrypted.toString(CryptoJS.enc.Utf8);
+    
+    if (!result) {
+      // Try without padding (some responses might not be padded correctly)
+      const decryptedNoPad = CryptoJS.AES.decrypt(
+        { ciphertext: ciphertext } as CryptoJS.lib.CipherParams,
+        key,
+        {
+          iv: iv,
+          mode: CryptoJS.mode.CBC,
+          padding: CryptoJS.pad.NoPadding
+        }
+      );
+      const rawResult = decryptedNoPad.toString(CryptoJS.enc.Utf8);
+      // Remove padding bytes manually
+      return rawResult.replace(/[\x00-\x1f]+$/, '');
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Decrypt error:', error);
+    throw error;
   }
-  
-  for (let i = 16; i < 32; i += 4) {
-    ivWords.push(
-      (token[i] << 24) | (token[i + 1] << 16) | (token[i + 2] << 8) | token[i + 3]
-    );
-  }
-  
-  const key = CryptoJS.lib.WordArray.create(keyWords, 16);
-  const iv = CryptoJS.lib.WordArray.create(ivWords, 16);
-  
-  // Parse the Base64 encrypted data
-  const cipherParams = CryptoJS.lib.CipherParams.create({
-    ciphertext: CryptoJS.enc.Base64.parse(encryptedData)
-  });
-  
-  const decrypted = CryptoJS.AES.decrypt(cipherParams, key, {
-    iv: iv,
-    mode: CryptoJS.mode.CBC,
-    padding: CryptoJS.pad.Pkcs7
-  });
-  
-  return decrypted.toString(CryptoJS.enc.Utf8);
 }
 
 /**
