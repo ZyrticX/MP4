@@ -5,6 +5,7 @@
  */
 
 import CryptoJS from 'crypto-js';
+import crypto from 'crypto';
 
 /**
  * Create login secret from email and password
@@ -38,82 +39,43 @@ export function updateEncryptionToken(currentToken: Buffer, serverToken: string)
 }
 
 /**
- * Encrypt data using AES-128-CBC
+ * Encrypt data using AES-128-CBC (using Node.js crypto)
  * Key is first 16 bytes of token, IV is last 16 bytes
  */
 export function encrypt(data: string, token: Buffer): string {
-  const key = CryptoJS.lib.WordArray.create(token.subarray(0, 16) as unknown as number[]);
-  const iv = CryptoJS.lib.WordArray.create(token.subarray(16, 32) as unknown as number[]);
+  const key = token.subarray(0, 16);
+  const iv = token.subarray(16, 32);
   
-  const encrypted = CryptoJS.AES.encrypt(data, key, {
-    iv: iv,
-    mode: CryptoJS.mode.CBC,
-    padding: CryptoJS.pad.Pkcs7
-  });
+  const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
   
-  return encrypted.ciphertext.toString(CryptoJS.enc.Base64);
+  let encrypted = cipher.update(data, 'utf8');
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  
+  return encrypted.toString('base64');
 }
 
 /**
- * Decrypt data using AES-128-CBC
+ * Decrypt data using AES-128-CBC (using Node.js crypto)
  */
 export function decrypt(encryptedData: string, token: Buffer): string {
   try {
-    // Convert token to WordArray properly
-    const keyWords: number[] = [];
-    const ivWords: number[] = [];
+    const key = token.subarray(0, 16);
+    const iv = token.subarray(16, 32);
     
-    for (let i = 0; i < 16; i += 4) {
-      keyWords.push(
-        ((token[i] & 0xff) << 24) | 
-        ((token[i + 1] & 0xff) << 16) | 
-        ((token[i + 2] & 0xff) << 8) | 
-        (token[i + 3] & 0xff)
-      );
-    }
+    console.log('Decrypt - Key (hex):', key.toString('hex'));
+    console.log('Decrypt - IV (hex):', iv.toString('hex'));
+    console.log('Decrypt - Input length:', encryptedData.length);
     
-    for (let i = 16; i < 32; i += 4) {
-      ivWords.push(
-        ((token[i] & 0xff) << 24) | 
-        ((token[i + 1] & 0xff) << 16) | 
-        ((token[i + 2] & 0xff) << 8) | 
-        (token[i + 3] & 0xff)
-      );
-    }
+    const encryptedBuffer = Buffer.from(encryptedData, 'base64');
+    console.log('Decrypt - Encrypted buffer length:', encryptedBuffer.length);
     
-    const key = CryptoJS.lib.WordArray.create(keyWords, 16);
-    const iv = CryptoJS.lib.WordArray.create(ivWords, 16);
+    const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
     
-    // Parse the Base64 encrypted data
-    const ciphertext = CryptoJS.enc.Base64.parse(encryptedData);
+    let decrypted = decipher.update(encryptedBuffer);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
     
-    const decrypted = CryptoJS.AES.decrypt(
-      { ciphertext: ciphertext } as CryptoJS.lib.CipherParams,
-      key,
-      {
-        iv: iv,
-        mode: CryptoJS.mode.CBC,
-        padding: CryptoJS.pad.Pkcs7
-      }
-    );
-    
-    const result = decrypted.toString(CryptoJS.enc.Utf8);
-    
-    if (!result) {
-      // Try without padding (some responses might not be padded correctly)
-      const decryptedNoPad = CryptoJS.AES.decrypt(
-        { ciphertext: ciphertext } as CryptoJS.lib.CipherParams,
-        key,
-        {
-          iv: iv,
-          mode: CryptoJS.mode.CBC,
-          padding: CryptoJS.pad.NoPadding
-        }
-      );
-      const rawResult = decryptedNoPad.toString(CryptoJS.enc.Utf8);
-      // Remove padding bytes manually
-      return rawResult.replace(/[\x00-\x1f]+$/, '');
-    }
+    const result = decrypted.toString('utf8');
+    console.log('Decrypt - Success! Result:', result.substring(0, 100));
     
     return result;
   } catch (error) {
