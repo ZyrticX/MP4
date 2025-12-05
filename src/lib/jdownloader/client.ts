@@ -349,7 +349,7 @@ export class JDownloaderClient {
 
   /**
    * Make an API call to the server (not device)
-   * Uses POST with encrypted body per MyJDownloader spec
+   * Uses GET for calls without params, POST with encrypted body for calls with params
    */
   private async callServer(path: string, params?: unknown[]): Promise<any> {
     if (!this.session) {
@@ -358,42 +358,41 @@ export class JDownloaderClient {
     
     const rid = generateRequestId();
     
-    // Build the payload
-    const payload = {
-      rid,
-      params: params || [],
-      apiVer: 1
-    };
-    
-    console.log('callServer - path:', path);
-    console.log('callServer - payload:', JSON.stringify(payload));
-    console.log('callServer - serverEncryptionToken (hex):', this.session.serverEncryptionToken.toString('hex'));
-    
-    // Encrypt the payload
-    const encryptedPayload = encrypt(
-      JSON.stringify(payload),
-      this.session.serverEncryptionToken
-    );
-    
-    // Build query string for signature (only rid, no params)
+    // Build query string for signature
     const queryForSignature = `${path}?rid=${rid}`;
     const signature = createSignature(queryForSignature, this.session.serverEncryptionToken);
-    
-    console.log('callServer - queryForSignature:', queryForSignature);
-    console.log('callServer - signature:', signature);
-    
     const url = `${API_ENDPOINT}${path}?rid=${rid}&signature=${signature}`;
-    console.log('callServer - url:', url);
     
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/aesjson-jd; charset=utf-8'
-      },
-      body: encryptedPayload
-    });
+    let response: Response;
     
-    console.log('callServer - response status:', response.status);
+    if (params && params.length > 0) {
+      // POST with encrypted body for calls with params
+      const payload = {
+        rid,
+        params,
+        apiVer: 1
+      };
+      
+      const encryptedPayload = encrypt(
+        JSON.stringify(payload),
+        this.session.serverEncryptionToken
+      );
+      
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/aesjson-jd; charset=utf-8'
+        },
+        body: encryptedPayload
+      });
+    } else {
+      // GET for calls without params (like listdevices)
+      response = await fetch(url, {
+        method: 'GET'
+      });
+    }
+    
+    console.log('callServer - url:', url, '- status:', response.status);
     
     if (!response.ok) {
       // Try to decrypt error response
