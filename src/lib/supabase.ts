@@ -4,11 +4,29 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl) {
+  throw new Error('Missing SUPABASE_URL environment variable');
+}
+
+// Use service role key if available, otherwise fall back to anon key
+const apiKey = supabaseServiceKey || supabaseAnonKey;
+
+if (!apiKey) {
+  throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY environment variable');
+}
+
+if (!supabaseServiceKey) {
+  console.warn('⚠️  Warning: Using ANON_KEY instead of SERVICE_ROLE_KEY.');
+  console.warn('   Some database operations may fail due to RLS policies.');
+  console.warn('   Get your service role key from: Supabase Dashboard → Settings → API');
+}
 
 // Service role client for backend operations
-export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+export const supabase = createClient(supabaseUrl, apiKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false

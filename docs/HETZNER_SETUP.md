@@ -152,24 +152,34 @@ nano .env
 ### תוכן קובץ .env (ערוך את הערכים!):
 
 ```env
-# MyJDownloader
-MYJD_EMAIL=YOUR_MYJD_EMAIL@example.com
-MYJD_PASSWORD=YOUR_MYJD_PASSWORD
+# ═══════════════════════════════════════════════════════════════════
+# MyJDownloader - הפרטים מהחשבון שלך ב-my.jdownloader.org
+# ═══════════════════════════════════════════════════════════════════
+MYJD_EMAIL=האימייל_שלך@example.com
+MYJD_PASSWORD=הסיסמה_שלך
 MYJD_DEVICE_NAME=HetznerServer
 
-# Supabase
-SUPABASE_URL=https://zhlrqnbfqcuqmnuqusyq.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpobHJxbmJmcWN1cW1udXF1c3lxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyNjI3OTEsImV4cCI6MjA3NzgzODc5MX0.cXmeFNhnI6BqumGa512P53DHMn-5tTQkA6rsWg6K7fw
-SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
+# ═══════════════════════════════════════════════════════════════════
+# Supabase - הפרויקט שלך
+# ═══════════════════════════════════════════════════════════════════
+SUPABASE_URL=https://jdyekwizsviuyklsrsky.supabase.co
+SUPABASE_ANON_KEY=המפתח_הציבורי_שלך
+SUPABASE_SERVICE_ROLE_KEY=המפתח_הסודי_מ_Dashboard
 
+# ═══════════════════════════════════════════════════════════════════
 # Server
+# ═══════════════════════════════════════════════════════════════════
 PORT=3001
 NODE_ENV=production
-CORS_ORIGIN=https://your-domain.com
 
+# CORS - הדומיין של האתר שלך (הפרונטאנד)
+# * = פתוח לכולם (לבדיקות)
+CORS_ORIGIN=*
+
+# ═══════════════════════════════════════════════════════════════════
 # Downloads
+# ═══════════════════════════════════════════════════════════════════
 DOWNLOAD_PATH=/opt/avimp4/downloads
-EOF
 ```
 
 ---
