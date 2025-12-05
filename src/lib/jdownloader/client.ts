@@ -435,7 +435,7 @@ export class JDownloaderClient {
     const response = await fetch(`${API_ENDPOINT}${devicePath}?signature=${signature}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json; charset=utf-8'
+        'Content-Type': 'application/aesjson-jd; charset=utf-8'
       },
       body: encryptedRequest
     });
