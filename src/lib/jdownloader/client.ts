@@ -349,7 +349,7 @@ export class JDownloaderClient {
 
   /**
    * Make an API call to the server (not device)
-   * Always uses POST with encrypted body per MyJDownloader spec
+   * Uses GET for server API calls per MyJDownloader spec
    */
   private async callServer(path: string, params?: unknown[]): Promise<any> {
     if (!this.session) {
@@ -363,53 +363,38 @@ export class JDownloaderClient {
     const signature = createSignature(queryForSignature, this.session.serverEncryptionToken);
     const url = `${API_ENDPOINT}${path}?rid=${rid}&signature=${signature}`;
     
-    // POST with encrypted body - even for calls without params
-    const payload = {
-      apiVer: 1,
-      params: params || [],
-      rid,
-      url: path
-    };
-    
-    const encryptedPayload = encrypt(
-      JSON.stringify(payload),
-      this.session.serverEncryptionToken
-    );
+    console.log('callServer - Making GET request to:', url);
     
     const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/aesjson-jd; charset=utf-8'
-      },
-      body: encryptedPayload
+      method: 'GET'
     });
     
-    console.log('callServer - url:', url, '- status:', response.status);
+    console.log('callServer - response status:', response.status);
+    
+    // Read response body once
+    const responseText = await response.text();
+    console.log('callServer - response body (first 200 chars):', responseText.substring(0, 200));
     
     if (!response.ok) {
-      // Try to decrypt error response
-      const errorText = await response.text();
+      // Try to parse error response
       let errorData: JDApiError;
       try {
-        const decrypted = decrypt(errorText, this.session.serverEncryptionToken);
-        errorData = JSON.parse(decrypted) as JDApiError;
+        // Error responses are usually plain JSON
+        errorData = JSON.parse(responseText) as JDApiError;
       } catch {
-        try {
-          errorData = JSON.parse(errorText) as JDApiError;
-        } catch {
-          throw new Error(`API error: HTTP ${response.status}`);
-        }
+        throw new Error(`API error: HTTP ${response.status} - ${responseText}`);
       }
       throw new Error(`API error: ${errorData.type}`);
     }
     
-    // Response is encrypted - decrypt it
-    const responseText = await response.text();
+    // Success response is encrypted - decrypt it
     try {
       const decrypted = decrypt(responseText, this.session.serverEncryptionToken);
+      console.log('callServer - decrypted response:', decrypted.substring(0, 200));
       return JSON.parse(decrypted);
-    } catch {
+    } catch (e) {
       // Fallback to plain JSON
+      console.log('callServer - decryption failed, trying plain JSON');
       return JSON.parse(responseText);
     }
   }

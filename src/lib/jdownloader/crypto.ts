@@ -33,9 +33,20 @@ export function createDeviceSecret(email: string, password: string): Buffer {
  * newToken = SHA256(currentToken + hexToBytes(serverResponseToken))
  */
 export function updateEncryptionToken(currentToken: Buffer, serverToken: string): Buffer {
+  console.log('updateEncryptionToken - serverToken (string):', serverToken);
+  console.log('updateEncryptionToken - serverToken length:', serverToken.length);
+  
   const serverTokenBytes = Buffer.from(serverToken, 'hex');
+  console.log('updateEncryptionToken - serverTokenBytes length:', serverTokenBytes.length);
+  console.log('updateEncryptionToken - serverTokenBytes (hex):', serverTokenBytes.toString('hex'));
+  
   const combined = Buffer.concat([currentToken, serverTokenBytes]);
-  return crypto.createHash('sha256').update(combined).digest();
+  console.log('updateEncryptionToken - combined length:', combined.length);
+  
+  const result = crypto.createHash('sha256').update(combined).digest();
+  console.log('updateEncryptionToken - result (hex):', result.toString('hex'));
+  
+  return result;
 }
 
 /**
@@ -76,7 +87,13 @@ export function decrypt(encryptedData: string, token: Buffer): string {
  * Create HMAC-SHA256 signature for a query string
  */
 export function createSignature(query: string, token: Buffer): string {
-  return crypto.createHmac('sha256', token).update(query, 'utf8').digest('hex');
+  console.log('createSignature - query:', query);
+  console.log('createSignature - token (hex):', token.toString('hex'));
+  
+  const signature = crypto.createHmac('sha256', token).update(query, 'utf8').digest('hex');
+  console.log('createSignature - signature:', signature);
+  
+  return signature;
 }
 
 /**
