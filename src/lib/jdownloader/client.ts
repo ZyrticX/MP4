@@ -58,19 +58,27 @@ export class JDownloaderClient {
     
     const response = await fetch(`${API_ENDPOINT}${query}&signature=${signature}`);
     
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('MyJDownloader API error:', errorText);
+      throw new Error(`Connection failed: HTTP ${response.status}`);
+    }
+    
     const responseText = await response.text();
     
     let data: { sessiontoken: string; regaintoken: string };
     try {
+      // First try to parse as plain JSON
       data = JSON.parse(responseText);
     } catch {
-      console.error('MyJDownloader API response:', responseText.substring(0, 500));
-      throw new Error(`MyJDownloader returned invalid response. Check your email (must be lowercase) and password.`);
-    }
-    
-    if (!response.ok) {
-      const error = data as unknown as JDApiError;
-      throw new Error(`Connection failed: ${error.type || 'Unknown error'}`);
+      // Response might be encrypted - try to decrypt it
+      try {
+        const decrypted = decrypt(responseText, loginSecret);
+        data = JSON.parse(decrypted);
+      } catch {
+        console.error('MyJDownloader API response (encrypted):', responseText.substring(0, 200));
+        throw new Error(`MyJDownloader returned encrypted response. Make sure your credentials are correct.`);
+      }
     }
     
     // Update encryption tokens with server response
