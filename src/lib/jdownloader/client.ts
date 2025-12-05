@@ -58,12 +58,20 @@ export class JDownloaderClient {
     
     const response = await fetch(`${API_ENDPOINT}${query}&signature=${signature}`);
     
-    if (!response.ok) {
-      const error = await response.json() as JDApiError;
-      throw new Error(`Connection failed: ${error.type}`);
+    const responseText = await response.text();
+    
+    let data: { sessiontoken: string; regaintoken: string };
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      console.error('MyJDownloader API response:', responseText.substring(0, 500));
+      throw new Error(`MyJDownloader returned invalid response. Check your email (must be lowercase) and password.`);
     }
     
-    const data = await response.json() as { sessiontoken: string; regaintoken: string };
+    if (!response.ok) {
+      const error = data as unknown as JDApiError;
+      throw new Error(`Connection failed: ${error.type || 'Unknown error'}`);
+    }
     
     // Update encryption tokens with server response
     const serverEncryptionToken = updateEncryptionToken(loginSecret, data.sessiontoken);

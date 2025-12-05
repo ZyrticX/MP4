@@ -50,9 +50,14 @@ app.use((req, res) => {
 // Startup
 async function start() {
   try {
-    // Connect to JDownloader on startup
+    // Try to connect to JDownloader on startup (but don't fail if it doesn't work)
     console.log('🔄 Connecting to JDownloader...');
-    await downloadService.connect();
+    try {
+      await downloadService.connect();
+    } catch (jdError) {
+      console.error('⚠️  JDownloader connection failed:', jdError instanceof Error ? jdError.message : jdError);
+      console.log('⚠️  Server will start anyway. JDownloader will reconnect when needed.');
+    }
     
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
