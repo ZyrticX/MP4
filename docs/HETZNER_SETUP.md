@@ -169,7 +169,7 @@ DOWNLOAD_API_SECRET=e977d952339bb0fcda0def1be3d78a608240b93adf1360b93c2ef12f10fe
 # ═══════════════════════════════════════════════════════════════════
 PORT=3001
 NODE_ENV=production
-CORS_ORIGIN=https://streemix.com
+CORS_ORIGIN=https://streemmix.com
 
 # ═══════════════════════════════════════════════════════════════════
 # Downloads
@@ -220,6 +220,8 @@ systemctl status avimp4-api
 
 ## 🌐 שלב 8: הגדרת Nginx (Reverse Proxy)
 
+**IP השרת שלך:** `77.42.29.11`
+
 ```bash
 # התקנת Nginx (אם לא מותקן)
 apt install -y nginx
@@ -228,7 +230,7 @@ apt install -y nginx
 cat > /etc/nginx/sites-available/avimp4 << 'EOF'
 server {
     listen 80;
-    server_name api.streemix.com;
+    server_name 77.42.29.11;
 
     location / {
         proxy_pass http://localhost:3001;
@@ -246,25 +248,34 @@ EOF
 
 # הפעלה
 ln -sf /etc/nginx/sites-available/avimp4 /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl restart nginx
 ```
 
-**💡 טיפ:** צור subdomain `api.streemix.com` שמצביע על ה-IP של השרת!
-
 ---
 
-## 🔒 שלב 9: הגדרת SSL (מומלץ מאוד!)
+## 🔒 שלב 9: הגדרת SSL (אופציונלי)
+
+**אם תרצה subdomain עם SSL** (כמו `api.streemmix.com`):
+
+1. צור A Record ב-DNS: `api.streemmix.com` → `77.42.29.11`
+2. אז תריץ:
 
 ```bash
-# התקנת Certbot
+# עדכון nginx לדומיין
+sed -i 's/77.42.29.11/api.streemmix.com/' /etc/nginx/sites-available/avimp4
+nginx -t && systemctl restart nginx
+
+# התקנת SSL
 apt install -y certbot python3-certbot-nginx
-
-# קבלת תעודת SSL
-certbot --nginx -d api.streemix.com
-
-# חידוש אוטומטי
+certbot --nginx -d api.streemmix.com
 systemctl enable certbot.timer
+```
+
+**בינתיים אפשר להשתמש ב-HTTP עם IP:**
+```
+http://77.42.29.11/api/downloads
 ```
 
 ---
@@ -368,8 +379,10 @@ df -h /opt/avimp4/downloads
 
 **כתובת ה-API שלך:**
 ```
-https://api.streemix.com/api/downloads
+http://77.42.29.11/api/downloads
 ```
+
+(או `https://api.streemmix.com/api/downloads` אם הגדרת SSL)
 
 ---
 
