@@ -120,7 +120,7 @@ export class DownloadService {
       .single();
 
     if (error) {
-      throw new Error(`Failed to create download job: ${error.message}`);
+      throw new Error(`Failed to create download job: ${(error as Error).message || String(error)}`);
     }
 
     // Start the download process asynchronously
@@ -433,7 +433,7 @@ export class DownloadService {
       .limit(limit);
 
     if (error) {
-      throw new Error(`Failed to fetch jobs: ${error.message}`);
+      throw new Error(`Failed to fetch jobs: ${(error as Error).message || String(error)}`);
     }
 
     return data || [];

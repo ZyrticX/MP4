@@ -59,11 +59,11 @@ export class JDownloaderClient {
     const response = await fetch(`${API_ENDPOINT}${query}&signature=${signature}`);
     
     if (!response.ok) {
-      const error: JDApiError = await response.json();
+      const error = await response.json() as JDApiError;
       throw new Error(`Connection failed: ${error.type}`);
     }
     
-    const data = await response.json();
+    const data = await response.json() as { sessiontoken: string; regaintoken: string };
     
     // Update encryption tokens with server response
     const serverEncryptionToken = updateEncryptionToken(loginSecret, data.sessiontoken);
@@ -334,11 +334,11 @@ export class JDownloaderClient {
     const response = await fetch(`${API_ENDPOINT}${query}`);
     
     if (!response.ok) {
-      const error: JDApiError = await response.json();
+      const error = await response.json() as JDApiError;
       throw new Error(`API error: ${error.type}`);
     }
     
-    return response.json();
+    return response.json() as Promise<any>;
   }
 
   /**
@@ -387,10 +387,10 @@ export class JDownloaderClient {
         // Try to decrypt error response
         const encryptedError = await response.text();
         const decryptedError = decrypt(encryptedError, this.session.deviceEncryptionToken);
-        errorData = JSON.parse(decryptedError);
+        errorData = JSON.parse(decryptedError) as JDApiError;
       } catch {
         // If decryption fails, try plain JSON
-        errorData = await response.json();
+        errorData = await response.json() as JDApiError;
       }
       throw new Error(`Device API error: ${errorData.type}`);
     }

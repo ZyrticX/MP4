@@ -37,7 +37,7 @@ async function callEdgeFunction(
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  const data = await response.json();
+  const data = await response.json() as { error?: string; [key: string]: unknown };
   
   if (!response.ok) {
     throw new Error(data.error || `Edge function error: ${response.status}`);
