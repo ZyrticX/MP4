@@ -40,11 +40,12 @@ export function updateEncryptionToken(currentToken: Buffer, serverToken: string)
 
 /**
  * Encrypt data using AES-128-CBC (using Node.js crypto)
- * Key is first 16 bytes of token, IV is last 16 bytes
+ * According to MyJDownloader API: IV = first 16 bytes, Key = last 16 bytes
  */
 export function encrypt(data: string, token: Buffer): string {
-  const key = token.subarray(0, 16);
-  const iv = token.subarray(16, 32);
+  // IMPORTANT: IV is first half, Key is second half
+  const iv = token.subarray(0, 16);
+  const key = token.subarray(16, 32);
   
   const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
   
@@ -56,28 +57,22 @@ export function encrypt(data: string, token: Buffer): string {
 
 /**
  * Decrypt data using AES-128-CBC (using Node.js crypto)
+ * According to MyJDownloader API: IV = first 16 bytes, Key = last 16 bytes
  */
 export function decrypt(encryptedData: string, token: Buffer): string {
   try {
-    const key = token.subarray(0, 16);
-    const iv = token.subarray(16, 32);
-    
-    console.log('Decrypt - Key (hex):', key.toString('hex'));
-    console.log('Decrypt - IV (hex):', iv.toString('hex'));
-    console.log('Decrypt - Input length:', encryptedData.length);
+    // IMPORTANT: IV is first half, Key is second half (opposite of what you might expect!)
+    const iv = token.subarray(0, 16);
+    const key = token.subarray(16, 32);
     
     const encryptedBuffer = Buffer.from(encryptedData, 'base64');
-    console.log('Decrypt - Encrypted buffer length:', encryptedBuffer.length);
     
     const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
     
     let decrypted = decipher.update(encryptedBuffer);
     decrypted = Buffer.concat([decrypted, decipher.final()]);
     
-    const result = decrypted.toString('utf8');
-    console.log('Decrypt - Success! Result:', result.substring(0, 100));
-    
-    return result;
+    return decrypted.toString('utf8');
   } catch (error) {
     console.error('Decrypt error:', error);
     throw error;
