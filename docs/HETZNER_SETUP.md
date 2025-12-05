@@ -2,6 +2,8 @@
 
 מדריך מלא להתקנת המערכת על שרת Linux שרץ 24/7.
 
+**GitHub Repo:** https://github.com/ZyrticX/MP4.git
+
 ## 📋 דרישות מקדימות
 
 - שרת Hetzner עם Ubuntu 22.04 / Debian 12
@@ -121,35 +123,35 @@ systemctl status jdownloader
 ## 📦 שלב 6: התקנת AviMP4 API
 
 ```bash
-# יצירת תיקייה לפרויקט
-mkdir -p /opt/avimp4
-cd /opt/avimp4
+# מעבר לתיקיית opt
+cd /opt
 
-# שכפול או יצירת הקבצים
-# אם יש לך git repo:
-# git clone YOUR_REPO_URL .
+# שכפול הפרויקט מ-GitHub
+git clone https://github.com/ZyrticX/MP4.git avimp4
 
-# או העתקה ידנית של הקבצים מהמחשב שלך
+# מעבר לתיקייה
+cd avimp4
 ```
 
-### העלאת קבצים מהמחשב שלך:
-
-ב-PowerShell על המחשב שלך:
-```powershell
-# העתקת כל הקבצים לשרת
-scp -r C:\Users\Evgen\Desktop\AviMP4\* root@YOUR_SERVER_IP:/opt/avimp4/
-```
-
-### המשך על השרת:
+### המשך ההתקנה:
 
 ```bash
-cd /opt/avimp4
-
 # התקנת dependencies
 npm install
 
-# יצירת קובץ .env
-cat > .env << 'EOF'
+# יצירת תיקיית הורדות
+mkdir -p downloads
+
+# העתקת תבנית ההגדרות
+cp env.template .env
+
+# עריכת קובץ ההגדרות
+nano .env
+```
+
+### תוכן קובץ .env (ערוך את הערכים!):
+
+```env
 # MyJDownloader
 MYJD_EMAIL=YOUR_MYJD_EMAIL@example.com
 MYJD_PASSWORD=YOUR_MYJD_PASSWORD
@@ -300,17 +302,26 @@ df -h /opt/avimp4/downloads
 
 ```
 /opt/
-├── jdownloader/           # JDownloader 2
+├── jdownloader/              # JDownloader 2
 │   ├── JDownloader.jar
-│   ├── cfg/               # הגדרות
-│   └── logs/              # לוגים
+│   ├── cfg/                  # הגדרות
+│   └── logs/                 # לוגים
 │
-└── avimp4/                # ה-API שלנו
-    ├── dist/              # קוד מקומפל
-    ├── downloads/         # קבצים שהורדו
-    ├── node_modules/
-    ├── .env
-    └── package.json
+└── avimp4/                   # ה-API שלנו (מ-GitHub)
+    ├── src/                  # קוד מקור
+    │   ├── index.ts
+    │   ├── lib/
+    │   │   ├── jdownloader/  # לקוח JDownloader
+    │   │   └── supabase.ts
+    │   ├── routes/
+    │   └── services/
+    ├── dist/                 # קוד מקומפל (נוצר אחרי npm run build)
+    ├── downloads/            # קבצים שהורדו
+    ├── docs/                 # תיעוד
+    ├── .env                  # הגדרות (לא ב-Git!)
+    ├── env.template          # תבנית להגדרות
+    ├── package.json
+    └── tsconfig.json
 ```
 
 ---
