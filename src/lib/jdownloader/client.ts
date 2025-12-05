@@ -360,11 +360,31 @@ export class JDownloaderClient {
     const response = await fetch(`${API_ENDPOINT}${query}`);
     
     if (!response.ok) {
-      const error = await response.json() as JDApiError;
-      throw new Error(`API error: ${error.type}`);
+      // Try to decrypt error response
+      const errorText = await response.text();
+      let errorData: JDApiError;
+      try {
+        const decrypted = decrypt(errorText, this.session.serverEncryptionToken);
+        errorData = JSON.parse(decrypted) as JDApiError;
+      } catch {
+        try {
+          errorData = JSON.parse(errorText) as JDApiError;
+        } catch {
+          throw new Error(`API error: HTTP ${response.status}`);
+        }
+      }
+      throw new Error(`API error: ${errorData.type}`);
     }
     
-    return response.json() as Promise<any>;
+    // Response is encrypted - decrypt it
+    const responseText = await response.text();
+    try {
+      const decrypted = decrypt(responseText, this.session.serverEncryptionToken);
+      return JSON.parse(decrypted);
+    } catch {
+      // Fallback to plain JSON
+      return JSON.parse(responseText);
+    }
   }
 
   /**
