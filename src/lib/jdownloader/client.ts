@@ -432,14 +432,15 @@ export class JDownloaderClient {
       apiVer: 1
     };
     
+    console.log('callDevice - action:', action);
+    console.log('callDevice - params:', JSON.stringify(params));
+    console.log('callDevice - requestData:', JSON.stringify(requestData));
+    
     // Encrypt the request
     const encryptedRequest = encrypt(
       JSON.stringify(requestData),
       this.session.deviceEncryptionToken
     );
-    
-    console.log('callDevice - sending to:', `${API_ENDPOINT}${devicePath}?signature=${signature}`);
-    console.log('callDevice - body.url:', urlWithSignature);
     
     const response = await fetch(`${API_ENDPOINT}${devicePath}?signature=${signature}`, {
       method: 'POST',
