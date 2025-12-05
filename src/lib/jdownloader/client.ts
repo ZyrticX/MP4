@@ -428,11 +428,12 @@ export class JDownloaderClient {
       this.session.deviceEncryptionToken
     );
     
-    // Build the device URL with session token
+    // Build the device URL with session token AND rid
     const devicePath = `/t_${this.session.sessionToken}_${this.currentDevice.id}${action}`;
-    const signature = createSignature(devicePath, this.session.deviceEncryptionToken);
+    const queryWithRid = `${devicePath}?rid=${rid}`;
+    const signature = createSignature(queryWithRid, this.session.deviceEncryptionToken);
     
-    const response = await fetch(`${API_ENDPOINT}${devicePath}?signature=${signature}`, {
+    const response = await fetch(`${API_ENDPOINT}${devicePath}?rid=${rid}&signature=${signature}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/aesjson-jd; charset=utf-8'
