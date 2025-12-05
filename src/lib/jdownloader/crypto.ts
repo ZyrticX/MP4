@@ -58,10 +58,31 @@ export function encrypt(data: string, token: Buffer): string {
  * Decrypt data using AES-128-CBC
  */
 export function decrypt(encryptedData: string, token: Buffer): string {
-  const key = CryptoJS.lib.WordArray.create(token.subarray(0, 16) as unknown as number[]);
-  const iv = CryptoJS.lib.WordArray.create(token.subarray(16, 32) as unknown as number[]);
+  // Convert token to WordArray properly
+  const keyWords: number[] = [];
+  const ivWords: number[] = [];
   
-  const decrypted = CryptoJS.AES.decrypt(encryptedData, key, {
+  for (let i = 0; i < 16; i += 4) {
+    keyWords.push(
+      (token[i] << 24) | (token[i + 1] << 16) | (token[i + 2] << 8) | token[i + 3]
+    );
+  }
+  
+  for (let i = 16; i < 32; i += 4) {
+    ivWords.push(
+      (token[i] << 24) | (token[i + 1] << 16) | (token[i + 2] << 8) | token[i + 3]
+    );
+  }
+  
+  const key = CryptoJS.lib.WordArray.create(keyWords, 16);
+  const iv = CryptoJS.lib.WordArray.create(ivWords, 16);
+  
+  // Parse the Base64 encrypted data
+  const cipherParams = CryptoJS.lib.CipherParams.create({
+    ciphertext: CryptoJS.enc.Base64.parse(encryptedData)
+  });
+  
+  const decrypted = CryptoJS.AES.decrypt(cipherParams, key, {
     iv: iv,
     mode: CryptoJS.mode.CBC,
     padding: CryptoJS.pad.Pkcs7
