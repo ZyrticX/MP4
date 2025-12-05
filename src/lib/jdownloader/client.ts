@@ -92,8 +92,14 @@ export class JDownloaderClient {
     }
     
     // Update encryption tokens with server response
+    console.log('connect - sessiontoken from server:', data.sessiontoken);
+    console.log('connect - loginSecret (hex):', loginSecret.toString('hex'));
+    
     const serverEncryptionToken = updateEncryptionToken(loginSecret, data.sessiontoken);
     const deviceEncryptionToken = updateEncryptionToken(deviceSecret, data.sessiontoken);
+    
+    console.log('connect - serverEncryptionToken (hex):', serverEncryptionToken.toString('hex'));
+    console.log('connect - deviceEncryptionToken (hex):', deviceEncryptionToken.toString('hex'));
     
     this.session = {
       sessionToken: data.sessiontoken,
@@ -101,6 +107,8 @@ export class JDownloaderClient {
       serverEncryptionToken,
       deviceEncryptionToken
     };
+    
+    console.log('✅ Session established successfully');
   }
 
   /**
@@ -357,6 +365,10 @@ export class JDownloaderClient {
       apiVer: 1
     };
     
+    console.log('callServer - path:', path);
+    console.log('callServer - payload:', JSON.stringify(payload));
+    console.log('callServer - serverEncryptionToken (hex):', this.session.serverEncryptionToken.toString('hex'));
+    
     // Encrypt the payload
     const encryptedPayload = encrypt(
       JSON.stringify(payload),
@@ -367,7 +379,11 @@ export class JDownloaderClient {
     const queryForSignature = `${path}?rid=${rid}`;
     const signature = createSignature(queryForSignature, this.session.serverEncryptionToken);
     
+    console.log('callServer - queryForSignature:', queryForSignature);
+    console.log('callServer - signature:', signature);
+    
     const url = `${API_ENDPOINT}${path}?rid=${rid}&signature=${signature}`;
+    console.log('callServer - url:', url);
     
     const response = await fetch(url, {
       method: 'POST',
@@ -376,6 +392,8 @@ export class JDownloaderClient {
       },
       body: encryptedPayload
     });
+    
+    console.log('callServer - response status:', response.status);
     
     if (!response.ok) {
       // Try to decrypt error response
