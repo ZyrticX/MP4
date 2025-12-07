@@ -430,9 +430,10 @@ export class JDownloaderClient {
     console.log('callDevice - signature:', signature);
     
     // Build the request body
-    // The 'url' field should be the action path (what the device sees after the proxy strips the prefix)
+    // IMPORTANT: The 'url' field MUST include the signature to match the HTTP URL
+    // JDownloader validates that body.url matches the HTTP request URL
     const requestData = {
-      url: action,  // Just the action, NOT with signature
+      url: `${action}?signature=${signature}`,  // Must match HTTP URL
       params: params || [],
       rid,
       apiVer: 1
