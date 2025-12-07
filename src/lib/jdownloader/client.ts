@@ -402,6 +402,12 @@ export class JDownloaderClient {
 
   /**
    * Make an API call to a specific device
+   * 
+   * MyJDownloader Device API Flow:
+   * 1. Build device path: /t_{sessionToken}_{deviceId}{action}
+   * 2. Sign the full device path with deviceEncryptionToken
+   * 3. Encrypt the request body with deviceEncryptionToken
+   * 4. POST to: {API_ENDPOINT}/t_{sessionToken}_{deviceId}{action}?signature={sig}
    */
   private async callDevice(action: string, params?: unknown[]): Promise<any> {
     if (!this.session) {
@@ -414,35 +420,41 @@ export class JDownloaderClient {
     
     const rid = generateRequestId();
     
-    // Build the device URL
+    // Build the full device path (this is what gets signed)
     const devicePath = `/t_${this.session.sessionToken}_${this.currentDevice.id}${action}`;
     
-    // Calculate signature on the path
+    // Sign the full device path
     const signature = createSignature(devicePath, this.session.deviceEncryptionToken);
     
-    // IMPORTANT: The url field in body must match what device receives after stripping prefix
-    // Device receives: /action?signature=xxx, so body.url must also be /action?signature=xxx
-    const urlWithSignature = `${action}?signature=${signature}`;
+    console.log('callDevice - devicePath for signature:', devicePath);
+    console.log('callDevice - signature:', signature);
     
-    // Build the request object
+    // Build the request body
+    // The 'url' field should be the action path (what the device sees after the proxy strips the prefix)
     const requestData = {
-      url: urlWithSignature,
+      url: action,  // Just the action, NOT with signature
       params: params || [],
       rid,
       apiVer: 1
     };
     
+    const requestJson = JSON.stringify(requestData);
     console.log('callDevice - action:', action);
     console.log('callDevice - params:', JSON.stringify(params));
-    console.log('callDevice - requestData:', JSON.stringify(requestData));
+    console.log('callDevice - requestData (full):', requestJson);
+    console.log('callDevice - requestData length:', requestJson.length);
     
-    // Encrypt the request
-    const encryptedRequest = encrypt(
-      JSON.stringify(requestData),
-      this.session.deviceEncryptionToken
-    );
+    // Encrypt the request body
+    const encryptedRequest = encrypt(requestJson, this.session.deviceEncryptionToken);
+    console.log('callDevice - encrypted request length:', encryptedRequest.length);
+    console.log('callDevice - encrypted request (first 100):', encryptedRequest.substring(0, 100));
     
-    const response = await fetch(`${API_ENDPOINT}${devicePath}?signature=${signature}`, {
+    // Send POST request to the device endpoint
+    const fullUrl = `${API_ENDPOINT}${devicePath}?signature=${signature}`;
+    console.log('callDevice - fullUrl:', fullUrl);
+    console.log('callDevice - fullUrl length:', fullUrl.length);
+    
+    const response = await fetch(fullUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/aesjson-jd; charset=utf-8'
@@ -450,21 +462,43 @@ export class JDownloaderClient {
       body: encryptedRequest
     });
     
+    console.log('callDevice - response status:', response.status);
+    
     if (!response.ok) {
-      let errorData: JDApiError;
+      const responseText = await response.text();
+      console.log('callDevice - error response (raw):', responseText.substring(0, 300));
+      
+      let errorData: JDApiError | undefined;
+      let errorMessage = `HTTP ${response.status}`;
+      
+      // Try multiple ways to parse the error
+      // 1. Try plain JSON first (error responses are often unencrypted)
       try {
-        // Try to decrypt error response
-        const encryptedError = await response.text();
-        const decryptedError = decrypt(encryptedError, this.session.deviceEncryptionToken);
-        errorData = JSON.parse(decryptedError) as JDApiError;
+        errorData = JSON.parse(responseText) as JDApiError;
+        console.log('callDevice - parsed error (plain JSON):', JSON.stringify(errorData));
       } catch {
-        // If decryption fails, try plain JSON
-        errorData = await response.json() as JDApiError;
+        // 2. Try to decrypt the error response
+        try {
+          const decryptedError = decrypt(responseText, this.session.deviceEncryptionToken);
+          console.log('callDevice - decrypted error:', decryptedError);
+          errorData = JSON.parse(decryptedError) as JDApiError;
+        } catch (decryptErr) {
+          console.log('callDevice - failed to decrypt/parse error:', decryptErr);
+          errorMessage += ` - ${responseText.substring(0, 100)}`;
+        }
       }
-      throw new Error(`Device API error: ${errorData.type}`);
+      
+      if (errorData) {
+        console.log('callDevice - error type:', errorData.type, 'src:', errorData.src);
+        if (errorData.data) {
+          console.log('callDevice - error data:', JSON.stringify(errorData.data));
+        }
+        throw new Error(`Device API error: ${errorData.type} (src: ${errorData.src})`);
+      }
+      throw new Error(`Device API error: ${errorMessage}`);
     }
     
-    // Decrypt and parse response
+    // Decrypt and parse successful response
     const encryptedResponse = await response.text();
     
     if (!encryptedResponse) {
@@ -473,11 +507,24 @@ export class JDownloaderClient {
     
     try {
       const decryptedResponse = decrypt(encryptedResponse, this.session.deviceEncryptionToken);
+      console.log('callDevice - decrypted response:', decryptedResponse.substring(0, 200));
       const parsed = JSON.parse(decryptedResponse);
+      
+      // Verify rid matches
+      if (parsed.rid && parsed.rid !== rid) {
+        console.warn('callDevice - rid mismatch:', { expected: rid, received: parsed.rid });
+      }
+      
       return parsed.data;
-    } catch {
+    } catch (decryptError) {
       // Response might be plain JSON
-      return JSON.parse(encryptedResponse);
+      console.log('callDevice - trying to parse as plain JSON');
+      try {
+        return JSON.parse(encryptedResponse);
+      } catch {
+        console.error('callDevice - failed to parse response:', encryptedResponse.substring(0, 100));
+        throw decryptError;
+      }
     }
   }
 
