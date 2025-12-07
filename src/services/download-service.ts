@@ -146,8 +146,7 @@ export class DownloadService {
         links: job.source_url,
         packageName: packageName || `Download_${job.id.slice(0, 8)}`,
         destinationFolder: this.downloadPath,
-        autostart: false,
-        assignJobID: true
+        autostart: false
       });
 
       await this.updateJob(job.id, { jd_job_id: collectingJob.id });
