@@ -141,9 +141,14 @@ export class DownloadService {
       // Update status to crawling
       await this.updateJob(job.id, { status: 'crawling', started_at: new Date().toISOString() });
 
-      // Add links to JDownloader - SIMPLE! Only links field
+      // Add links to JDownloader with required parameters
       const collectingJob = await this.jd.addLinks({
-        links: job.source_url
+        links: job.source_url,
+        assignJobID: true,
+        autostart: false,
+        autoExtract: false,
+        deepDecrypt: false,
+        overwritePackagizerRules: false
       });
 
       console.log('✅ addLinks response:', JSON.stringify(collectingJob));
