@@ -222,6 +222,13 @@ export class JDownloaderClient {
   }
 
   /**
+   * Set download directory for packages in LinkGrabber
+   */
+  async setDownloadDirectoryLinkGrabber(directory: string, packageUUIDs: number[]): Promise<void> {
+    return this.callDevice('/linkgrabberv2/setDownloadDirectory', [directory, packageUUIDs]);
+  }
+
+  /**
    * Remove specific links from LinkGrabber
    */
   async removeLinksFromGrabber(linkIds: number[], packageIds: number[]): Promise<void> {

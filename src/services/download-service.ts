@@ -141,20 +141,16 @@ export class DownloadService {
       // Update status to crawling
       await this.updateJob(job.id, { status: 'crawling', started_at: new Date().toISOString() });
 
-      // Add links to JDownloader
-      // overwritePackagizerRules: true is REQUIRED to use destinationFolder!
+      // Add links to JDownloader - SIMPLE! Only links field
       const collectingJob = await this.jd.addLinks({
-        links: job.source_url,
-        packageName: packageName || `Download_${job.id.slice(0, 8)}`,
-        destinationFolder: this.downloadPath,
-        autostart: false,
-        overwritePackagizerRules: true
+        links: job.source_url
       });
 
-      await this.updateJob(job.id, { jd_job_id: collectingJob.id });
+      console.log('✅ addLinks response:', JSON.stringify(collectingJob));
+      await this.updateJob(job.id, { jd_job_id: collectingJob?.id || null });
 
       // Wait for crawling to complete
-      await this.waitForCrawling(collectingJob.id);
+      await this.waitForCrawling(collectingJob?.id || 0);
 
       // Get crawled links and packages
       const packages = await this.jd.queryCrawledPackages({
@@ -164,7 +160,6 @@ export class DownloadService {
       });
 
       const links = await this.jd.queryCrawledLinks({
-        jobUUIDs: [collectingJob.id],
         bytesTotal: true,
         availability: true,
         variants: true,
@@ -179,6 +174,16 @@ export class DownloadService {
       const ourPackage = packages.find(p => 
         links.some(l => l.packageUUID === p.uuid)
       );
+
+      // Set download directory AFTER crawling (this is the correct way!)
+      if (ourPackage) {
+        try {
+          await this.jd.setDownloadDirectoryLinkGrabber(this.downloadPath, [ourPackage.uuid]);
+          console.log(`✅ Set download directory: ${this.downloadPath} for package ${ourPackage.uuid}`);
+        } catch (err) {
+          console.warn('⚠️ Failed to set download directory:', err);
+        }
+      }
 
       // Select quality variant if available (for YouTube, etc.)
       await this.selectQualityVariant(links, job.preferred_quality, job.media_type);
