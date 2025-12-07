@@ -551,10 +551,10 @@ export class JDownloaderClient {
     console.log('callDeviceWithObject - devicePath:', devicePath);
     console.log('callDeviceWithObject - signature:', signature);
     
-    // Build the request body - params as object directly (not array!)
+    // Build the request body - params must be array with object inside
     const requestData = {
       url: `${action}?signature=${signature}`,
-      params: params,  // Object directly, NOT wrapped in array
+      params: [params],  // Wrap object in array for API
       rid,
       apiVer: 1
     };
