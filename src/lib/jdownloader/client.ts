@@ -156,10 +156,10 @@ export class JDownloaderClient {
 
   /**
    * Add links to LinkGrabber
-   * Note: addLinks expects the query object directly, not wrapped in array
    */
   async addLinks(query: AddLinksQuery): Promise<LinkCollectingJob> {
-    return this.callDeviceWithObject('/linkgrabberv2/addLinks', query);
+    // Standard API call - params is array with query object inside
+    return this.callDevice('/linkgrabberv2/addLinks', [query]);
   }
 
   /**
@@ -527,83 +527,6 @@ export class JDownloaderClient {
         console.error('callDevice - failed to parse response:', encryptedResponse.substring(0, 100));
         throw decryptError;
       }
-    }
-  }
-
-  /**
-   * Make an API call to device with object params (not array)
-   * Some endpoints like addLinks expect the query object directly
-   */
-  private async callDeviceWithObject(action: string, params: unknown): Promise<any> {
-    if (!this.session) {
-      throw new Error('Not connected. Call connect() first.');
-    }
-    
-    if (!this.currentDevice) {
-      throw new Error('No device selected. Call selectDevice() first.');
-    }
-    
-    const rid = generateRequestId();
-    
-    const devicePath = `/t_${this.session.sessionToken}_${this.currentDevice.id}${action}`;
-    const signature = createSignature(devicePath, this.session.deviceEncryptionToken);
-    
-    console.log('callDeviceWithObject - devicePath:', devicePath);
-    console.log('callDeviceWithObject - signature:', signature);
-    
-    // Build the request body - params must be array with object inside
-    const requestData = {
-      url: `${action}?signature=${signature}`,
-      params: [params],  // Wrap object in array for API
-      rid,
-      apiVer: 1
-    };
-    
-    const requestJson = JSON.stringify(requestData);
-    console.log('callDeviceWithObject - requestData:', requestJson);
-    
-    const encryptedRequest = encrypt(requestJson, this.session.deviceEncryptionToken);
-    
-    const fullUrl = `${API_ENDPOINT}${devicePath}?signature=${signature}`;
-    
-    const response = await fetch(fullUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/aesjson-jd; charset=utf-8'
-      },
-      body: encryptedRequest
-    });
-    
-    console.log('callDeviceWithObject - response status:', response.status);
-    
-    if (!response.ok) {
-      const responseText = await response.text();
-      console.log('callDeviceWithObject - error response:', responseText.substring(0, 300));
-      
-      let errorData: JDApiError | undefined;
-      try {
-        errorData = JSON.parse(responseText) as JDApiError;
-      } catch {
-        try {
-          const decrypted = decrypt(responseText, this.session.deviceEncryptionToken);
-          errorData = JSON.parse(decrypted) as JDApiError;
-        } catch {
-          throw new Error(`Device API error: HTTP ${response.status}`);
-        }
-      }
-      throw new Error(`Device API error: ${errorData?.type || 'Unknown'}`);
-    }
-    
-    const encryptedResponse = await response.text();
-    if (!encryptedResponse) return null;
-    
-    try {
-      const decrypted = decrypt(encryptedResponse, this.session.deviceEncryptionToken);
-      console.log('callDeviceWithObject - decrypted response:', decrypted.substring(0, 200));
-      const parsed = JSON.parse(decrypted);
-      return parsed.data;
-    } catch {
-      return JSON.parse(encryptedResponse);
     }
   }
 
