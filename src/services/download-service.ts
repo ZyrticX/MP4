@@ -142,11 +142,13 @@ export class DownloadService {
       await this.updateJob(job.id, { status: 'crawling', started_at: new Date().toISOString() });
 
       // Add links to JDownloader
+      // overwritePackagizerRules: true is REQUIRED to use destinationFolder!
       const collectingJob = await this.jd.addLinks({
         links: job.source_url,
         packageName: packageName || `Download_${job.id.slice(0, 8)}`,
         destinationFolder: this.downloadPath,
-        autostart: false
+        autostart: false,
+        overwritePackagizerRules: true
       });
 
       await this.updateJob(job.id, { jd_job_id: collectingJob.id });
